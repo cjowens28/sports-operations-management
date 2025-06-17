@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_ui_policy">
+    <sys_ui_policy action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <conditions/>
+        <description>Role-based field visibility for sports incidents</description>
+        <global>true</global>
+        <inherit>false</inherit>
+        <model_id/>
+        <model_table/>
+        <name>Sports Incident Role-Based Visibility</name>
+        <on_load>true</on_load>
+        <order>100</order>
+        <reverse_if_false>true</reverse_if_false>
+        <script><![CDATA[
+// Hide sensitive fields from field staff
+if (!g_user.hasRole('x_som_sports_ops.sports_ops_manager') && 
+    !g_user.hasRole('x_som_sports_ops.sports_ops_coordinator')) {
+    
+    // Hide administrative fields
+    g_form.setVisible('assignment_group', false);
+    g_form.setVisible('escalation_reason', false);
+    g_form.setVisible('response_sla', false);
+    g_form.setVisible('resolution_sla', false);
+    
+    // Field staff can only update work notes, not resolution info
+    if (g_user.hasRole('x_som_sports_ops.field_staff')) {
+        g_form.setReadOnly('state', true);
+        g_form.setReadOnly('priority', true);
+        g_form.setReadOnly('close_code', true);
+        g_form.setReadOnly('close_notes', true);
+    }
+}
+
+// Security officers can update security-related incidents
+if (g_user.hasRole('x_som_sports_ops.security_officer')) {
+    var incidentType = g_form.getValue('incident_type');
+    if (incidentType === 'security' || incidentType === 'safety' || incidentType === 'crowd_control') {
+        g_form.setReadOnly('state', false);
+        g_form.setReadOnly('work_notes', false);
+    }
+}
+
+// Facilities technicians can update facility incidents
+if (g_user.hasRole('x_som_sports_ops.facilities_technician')) {
+    var incidentType = g_form.getValue('incident_type');
+    if (incidentType === 'facility' || incidentType === 'technical') {
+        g_form.setReadOnly('state', false);
+        g_form.setReadOnly('work_notes', false);
+    }
+}
+]]></script>
+        <short_description>Controls field visibility based on user roles</short_description>
+        <sys_class_name>sys_ui_policy</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_domain>global</sys_domain>
+        <sys_domain_path>/</sys_domain_path>
+        <sys_id>up001234567890123456789012345678901234up</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Sports Incident Role-Based Visibility</sys_name>
+        <sys_overrides/>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_ui_policy_up001234567890123456789012345678901234up</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <table>x_som_sports_ops_sports_incident</table>
+        <ui_type>desktop</ui_type>
+        <view/>
+    </sys_ui_policy>
+</record_update>

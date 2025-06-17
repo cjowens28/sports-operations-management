@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script">
+    <sys_script action="INSERT_OR_UPDATE">
+        <abort_action>false</abort_action>
+        <access>package_private</access>
+        <action_delete>false</action_delete>
+        <action_insert>false</action_insert>
+        <action_query>false</action_query>
+        <action_update>false</action_update>
+        <active>true</active>
+        <add_message>false</add_message>
+        <advanced>true</advanced>
+        <change_fields>false</change_fields>
+        <client_callable>false</client_callable>
+        <collection>x_som_sports_ops_sports_incident</collection>
+        <condition/>
+        <description>Scheduled script to check for incidents that need escalation</description>
+        <execute_function>false</execute_function>
+        <filter_condition/>
+        <is_rest>false</is_rest>
+        <message/>
+        <name>Sports Incident Auto Escalation</name>
+        <order>100</order>
+        <priority>100</priority>
+        <rest_method/>
+        <rest_method_text/>
+        <rest_service/>
+        <rest_service_text/>
+        <rest_variables/>
+        <role_conditions/>
+        <script><![CDATA[
+var SportsIncidentEscalation = Class.create();
+SportsIncidentEscalation.prototype = {
+    
+    initialize: function() {
+        this.currentTime = new GlideDateTime();
+    },
+    
+    checkForEscalation: function() {
+        this._checkResponseSLA();
+        this._checkResolutionSLA();
+        this._checkCriticalIncidents();
+    },
+    
+    _checkResponseSLA: function() {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.addQuery('state', 'IN', '1,2'); // New or In Progress
+        incidentGR.addQuery('response_sla', '<', this.currentTime);
+        incidentGR.addQuery('sla_escalated', false);
+        incidentGR.query();
+        
+        while (incidentGR.next()) {
+            this._escalateIncident(incidentGR, 'Response SLA Breach');
+        }
+    },
+    
+    _checkResolutionSLA: function() {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.addQuery('state', 'IN', '1,2,3'); // Not resolved/closed
+        incidentGR.addQuery('resolution_sla', '<', this.currentTime);
+        incidentGR.addQuery('resolution_escalated', false);
+        incidentGR.query();
+        
+        while (incidentGR.next()) {
+            this._escalateIncident(incidentGR, 'Resolution SLA Breach');
+        }
+    },
+    
+    _checkCriticalIncidents: function() {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.addQuery('priority', '1');
+        incidentGR.addQuery('state', 'IN', '1,2');
+        
+        // Check incidents open for more than 30 minutes
+        var thirtyMinutesAgo = new GlideDateTime();
+        thirtyMinutesAgo.addMinutes(-30);
+        incidentGR.addQuery('sys_created_on', '<', thirtyMinutesAgo);
+        incidentGR.addQuery('critical_escalated', false);
+        incidentGR.query();
+        
+        while (incidentGR.next()) {
+            this._escalateCriticalIncident(incidentGR);
+        }
+    },
+    
+    _escalateIncident: function(incidentGR, reason) {
+        // Update incident
+        incidentGR.escalation_reason = reason;
+        incidentGR.escalation_time = this.currentTime;
+        incidentGR.sla_escalated = true;
+        
+        // Escalate to manager
+        var managerGR = this._getEscalationManager(incidentGR);
+        if (managerGR) {
+            incidentGR.assigned_to = managerGR.sys_id;
+        }
+        
+        // Add work note
+        incidentGR.work_notes = 'Incident escalated: ' + reason + ' at ' + this.currentTime.getDisplayValue();
+        incidentGR.update();
+        
+        // Send notification
+        this._sendEscalationNotification(incidentGR, reason);
+        
+        gs.log('Escalated incident ' + incidentGR.number + ': ' + reason, 'SportsIncidentEscalation');
+    },
+    
+    _escalateCriticalIncident: function(incidentGR) {
+        incidentGR.critical_escalated = true;
+        incidentGR.escalation_reason = 'Critical incident open for 30+ minutes';
+        incidentGR.escalation_time = this.currentTime;
+        
+        // Notify venue manager and operations director
+        var venueGR = new GlideRecord('x_som_sports_ops_venue');
+        if (venueGR.get(incidentGR.venue)) {
+            // Send to multiple escalation levels
+            var recipients = [];
+            if (venueGR.operations_manager) recipients.push(venueGR.operations_manager.email);
+            if (venueGR.general_manager) recipients.push(venueGR.general_manager.email);
+            
+            var email = new GlideEmailOutbound();
+            email.setTo(recipients.join(','));
+            email.setSubject('CRITICAL ESCALATION: ' + incidentGR.short_description);
+            email.setBody(this._buildCriticalEscalationEmail(incidentGR));
+            email.send();
+        }
+        
+        incidentGR.work_notes = 'Critical incident escalated to senior management due to extended duration.';
+        incidentGR.update();
+        
+        gs.log('Critical escalation for incident ' + incidentGR.number, 'SportsIncidentEscalation');
+    },
+    
+    _getEscalationManager: function(incidentGR) {
+        var assignmentGroupGR = new GlideRecord('sys_user_group');
+        if (assignmentGroupGR.get(incidentGR.assignment_group)) {
+            return assignmentGroupGR.manager;
+        }
+        return null;
+    },
+    
+    _sendEscalationNotification: function(incidentGR, reason) {
+        var email = new GlideEmailOutbound();
+        email.setTo(incidentGR.assigned_to.email);
+        email.setSubject('Incident Escalation: ' + incidentGR.number);
+        email.setBody(this._buildEscalationEmail(incidentGR, reason));
+        email.send();
+    },
+    
+    _buildEscalationEmail: function(incidentGR, reason) {
+        var body = 'An incident has been escalated to you.\n\n';
+        body += 'Escalation Reason: ' + reason + '\n';
+        body += 'Incident Number: ' + incidentGR.number + '\n';
+        body += 'Description: ' + incidentGR.short_description + '\n';
+        body += 'Priority: ' + incidentGR.priority.getDisplayValue() + '\n';
+        body += 'Location: ' + incidentGR.location + '\n';
+        body += 'Created: ' + incidentGR.sys_created_on.getDisplayValue() + '\n';
+        body += 'Current State: ' + incidentGR.state.getDisplayValue() + '\n\n';
+        body += 'Please take immediate action on this incident.\n\n';
+        body += 'Access the incident: ' + gs.getProperty('glide.servlet.uri') + incidentGR.getLink();
+        return body;
+    },
+    
+    _buildCriticalEscalationEmail: function(incidentGR) {
+        var body = 'CRITICAL INCIDENT ESCALATION\n\n';
+        body += 'A critical sports incident has been open for over 30 minutes without resolution.\n\n';
+        body += 'Incident Details:\n';
+        body += '- Number: ' + incidentGR.number + '\n';
+        body += '- Type: ' + incidentGR.incident_type.getDisplayValue() + '\n';
+        body += '- Description: ' + incidentGR.short_description + '\n';
+        body += '- Location: ' + incidentGR.location + '\n';
+        body += '- Reporter: ' + incidentGR.caller_id.name + '\n';
+        body += '- Created: ' + incidentGR.sys_created_on.getDisplayValue() + '\n';
+        body += '- Current Assignee: ' + (incidentGR.assigned_to ? incidentGR.assigned_to.name : 'Unassigned') + '\n\n';
+        body += 'This incident requires immediate senior management attention.\n\n';
+        body += 'Access the incident: ' + gs.getProperty('glide.servlet.uri') + incidentGR.getLink();
+        return body;
+    },
+    
+    type: 'SportsIncidentEscalation'
+};
+
+// Execute the escalation check
+var escalation = new SportsIncidentEscalation();
+escalation.checkForEscalation();
+]]></script>
+        <sys_class_name>sys_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>ae001234567890123456789012345678901234ae</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Sports Incident Auto Escalation</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_script_ae001234567890123456789012345678901234ae</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <template/>
+        <when>manual</when>
+    </sys_script>
+</record_update>

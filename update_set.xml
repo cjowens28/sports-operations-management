@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2024-01-01 00:00:00">
+    <sys_remote_update_set action="INSERT_OR_UPDATE">
+        <application display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</application>
+        <application_name>Sports Operations Management</application_name>
+        <application_scope>x_som_sports_ops</application_scope>
+        <application_version>1.0.0</application_version>
+        <collisions_must_merge>false</collisions_must_merge>
+        <completed_on/>
+        <created_on>2024-01-01 00:00:00</created_on>
+        <description>Sports Operations Management - Complete venue operations platform</description>
+        <inserted_on>2024-01-01 00:00:00</inserted_on>
+        <name>Sports Operations Management v1.0.0</name>
+        <origin_sys_id/>
+        <release_date/>
+        <remote_sys_id>a1b2c3d4e5f6789012345678901234567890abcd</remote_sys_id>
+        <size>0</size>
+        <state>loaded</state>
+        <summary/>
+        <sys_class_name>sys_remote_update_set</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>b2c3d4e5f6789012345678901234567890abcdef</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <update_source>Studio</update_source>
+        <update_type>enhancement</update_type>
+        <url/>
+    </sys_remote_update_set>
+</unload>

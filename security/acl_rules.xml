@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update>
+    <!-- Sports Incident Table ACL - Read -->
+    <sys_security_acl action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <admin_overrides>true</admin_overrides>
+        <advanced>false</advanced>
+        <condition/>
+        <description>Read access to sports incidents based on role</description>
+        <name>x_som_sports_ops_sports_incident</name>
+        <operation>read</operation>
+        <script><![CDATA[
+// Allow full access for managers and coordinators
+if (gs.hasRole('x_som_sports_ops.sports_ops_manager') || 
+    gs.hasRole('x_som_sports_ops.sports_ops_coordinator')) {
+    answer = true;
+} 
+// Field staff can only see incidents they reported or are assigned to
+else if (gs.hasRole('x_som_sports_ops.field_staff')) {
+    answer = (current.caller_id == gs.getUserID() || current.assigned_to == gs.getUserID());
+}
+// Security officers can see security-related incidents
+else if (gs.hasRole('x_som_sports_ops.security_officer')) {
+    answer = (current.incident_type == 'security' || current.incident_type == 'safety' || 
+              current.incident_type == 'crowd_control');
+}
+// Facilities technicians can see facility-related incidents
+else if (gs.hasRole('x_som_sports_ops.facilities_technician')) {
+    answer = (current.incident_type == 'facility' || current.incident_type == 'technical');
+}
+else {
+    answer = false;
+}
+]]></script>
+        <sys_class_name>sys_security_acl</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>acl123456789012345678901234567890123456</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>x_som_sports_ops_sports_incident.None</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_security_acl_acl123456789012345678901234567890123456</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <type>record</type>
+    </sys_security_acl>
+    
+    <!-- Sports Incident Table ACL - Write -->
+    <sys_security_acl action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <admin_overrides>true</admin_overrides>
+        <advanced>false</advanced>
+        <condition/>
+        <description>Write access to sports incidents based on role</description>
+        <name>x_som_sports_ops_sports_incident</name>
+        <operation>write</operation>
+        <script><![CDATA[
+// Managers and coordinators have full write access
+if (gs.hasRole('x_som_sports_ops.sports_ops_manager') || 
+    gs.hasRole('x_som_sports_ops.sports_ops_coordinator')) {
+    answer = true;
+}
+// Assigned technicians can update their incidents
+else if ((gs.hasRole('x_som_sports_ops.security_officer') || 
+          gs.hasRole('x_som_sports_ops.facilities_technician')) &&
+         current.assigned_to == gs.getUserID()) {
+    answer = true;
+}
+else {
+    answer = false;
+}
+]]></script>
+        <sys_class_name>sys_security_acl</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>acl234567890123456789012345678901234567</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>x_som_sports_ops_sports_incident.write</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_security_acl_acl234567890123456789012345678901234567</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <type>record</type>
+    </sys_security_acl>
+    
+    <!-- Staff Assignment Table ACL - Read -->
+    <sys_security_acl action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <admin_overrides>true</admin_overrides>
+        <advanced>false</advanced>
+        <condition/>
+        <description>Read access to staff assignments</description>
+        <name>x_som_sports_ops_staff_assignment</name>
+        <operation>read</operation>
+        <script><![CDATA[
+// Managers and coordinators can see all assignments
+if (gs.hasRole('x_som_sports_ops.sports_ops_manager') || 
+    gs.hasRole('x_som_sports_ops.sports_ops_coordinator')) {
+    answer = true;
+}
+// Staff can see their own assignments
+else if (current.staff_member == gs.getUserID()) {
+    answer = true;
+}
+else {
+    answer = false;
+}
+]]></script>
+        <sys_class_name>sys_security_acl</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>acl345678901234567890123456789012345678</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>x_som_sports_ops_staff_assignment.read</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_security_acl_acl345678901234567890123456789012345678</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <type>record</type>
+    </sys_security_acl>
+    
+    <!-- Facility Asset Table ACL - Read -->
+    <sys_security_acl action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <admin_overrides>true</admin_overrides>
+        <advanced>false</advanced>
+        <condition/>
+        <description>Read access to facility assets</description>
+        <name>x_som_sports_ops_facility_asset</name>
+        <operation>read</operation>
+        <script><![CDATA[
+// Managers, coordinators, and facilities staff can read assets
+if (gs.hasRole('x_som_sports_ops.sports_ops_manager') || 
+    gs.hasRole('x_som_sports_ops.sports_ops_coordinator') ||
+    gs.hasRole('x_som_sports_ops.facilities_technician')) {
+    answer = true;
+}
+else {
+    answer = false;
+}
+]]></script>
+        <sys_class_name>sys_security_acl</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>acl456789012345678901234567890123456789</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>x_som_sports_ops_facility_asset.read</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_security_acl_acl456789012345678901234567890123456789</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <type>record</type>
+    </sys_security_acl>
+    
+    <!-- Maintenance Request Table ACL - Write -->
+    <sys_security_acl action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <admin_overrides>true</admin_overrides>
+        <advanced>false</advanced>
+        <condition/>
+        <description>Write access to maintenance requests</description>
+        <name>x_som_sports_ops_maintenance_request</name>
+        <operation>write</operation>
+        <script><![CDATA[
+// Managers and coordinators have full write access
+if (gs.hasRole('x_som_sports_ops.sports_ops_manager') || 
+    gs.hasRole('x_som_sports_ops.sports_ops_coordinator')) {
+    answer = true;
+}
+// Facilities technicians can update assigned requests
+else if (gs.hasRole('x_som_sports_ops.facilities_technician') &&
+         current.assigned_to == gs.getUserID()) {
+    answer = true;
+}
+else {
+    answer = false;
+}
+]]></script>
+        <sys_class_name>sys_security_acl</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>acl567890123456789012345678901234567890</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>x_som_sports_ops_maintenance_request.write</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_security_acl_acl567890123456789012345678901234567890</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <type>record</type>
+    </sys_security_acl>
+</record_update>

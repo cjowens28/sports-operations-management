@@ -1,0 +1,31 @@
+# ServiceNow specific
+*.log
+temp/
+node_modules/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Build artifacts
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+
+# API keys and secrets (if any configuration files are added later)
+config/secrets.json
+api_keys.txt

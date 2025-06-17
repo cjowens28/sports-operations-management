@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_ui_page">
+    <sys_ui_page action="INSERT_OR_UPDATE">
+        <category>general</category>
+        <client_script/>
+        <description>Game Day Control Center - Real-time operations dashboard</description>
+        <direct>false</direct>
+        <endpoint>x_som_sports_ops_game_day_control_center.do</endpoint>
+        <html><![CDATA[<?xml version="1.0" encoding="utf-8" ?>
+<j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
+    <html>
+    <head>
+        <title>Game Day Control Center</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <link rel="stylesheet" type="text/css" href="styles/base.css"/>
+        <link rel="stylesheet" type="text/css" href="styles/retina_icons.css"/>
+        <script type="text/javascript" src="scripts/classes/Ajax.js"></script>
+        <script type="text/javascript" src="scripts/doctype/js_includes_doctype.js"></script>
+        <style>
+            .control-center {
+                padding: 20px;
+                background: #f8f9fa;
+                min-height: 100vh;
+            }
+            .header-section {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .metrics-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+                margin-bottom: 20px;
+            }
+            .metric-card {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+            .metric-value {
+                font-size: 2em;
+                font-weight: bold;
+                color: #007bff;
+            }
+            .metric-label {
+                color: #666;
+                margin-top: 5px;
+            }
+            .status-indicator {
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                margin-right: 8px;
+            }
+            .status-green { background-color: #28a745; }
+            .status-yellow { background-color: #ffc107; }
+            .status-red { background-color: #dc3545; }
+            .dashboard-section {
+                background: white;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .section-title {
+                font-size: 1.2em;
+                font-weight: bold;
+                margin-bottom: 15px;
+                color: #333;
+            }
+            .task-list {
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            .task-item {
+                padding: 10px;
+                border-bottom: 1px solid #eee;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .task-priority-high { border-left: 4px solid #dc3545; }
+            .task-priority-medium { border-left: 4px solid #ffc107; }
+            .task-priority-low { border-left: 4px solid #28a745; }
+            .btn-refresh {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="control-center">
+            <!-- Header Section -->
+            <div class="header-section">
+                <h1>Game Day Control Center</h1>
+                <p>Event: <strong id="current-event">Loading...</strong></p>
+                <p>Status: <span class="status-indicator status-green"></span>Operational</p>
+                <button class="btn-refresh" onclick="refreshDashboard()">Refresh</button>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="active-tasks">-</div>
+                    <div class="metric-label">Active Tasks</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="open-incidents">-</div>
+                    <div class="metric-label">Open Incidents</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="staff-on-duty">-</div>
+                    <div class="metric-label">Staff On Duty</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="system-status">-</div>
+                    <div class="metric-label">Systems Online</div>
+                </div>
+            </div>
+
+            <!-- Dashboard Sections -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Critical Tasks -->
+                <div class="dashboard-section">
+                    <div class="section-title">Critical Tasks</div>
+                    <div class="task-list" id="critical-tasks">
+                        Loading...
+                    </div>
+                </div>
+
+                <!-- Recent Incidents -->
+                <div class="dashboard-section">
+                    <div class="section-title">Recent Incidents</div>
+                    <div class="task-list" id="recent-incidents">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Staff Assignments -->
+            <div class="dashboard-section">
+                <div class="section-title">Current Staff Assignments</div>
+                <div id="staff-assignments">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function refreshDashboard() {
+                // Refresh metrics
+                loadMetrics();
+                // Refresh tasks and incidents
+                loadCriticalTasks();
+                loadRecentIncidents();
+                loadStaffAssignments();
+            }
+
+            function loadMetrics() {
+                var ga = new GlideAjax('GameDayControlCenterAjax');
+                ga.addParam('sysparm_name', 'getMetrics');
+                ga.getXMLAnswer(function(answer) {
+                    var metrics = JSON.parse(answer);
+                    document.getElementById('active-tasks').textContent = metrics.activeTasks;
+                    document.getElementById('open-incidents').textContent = metrics.openIncidents;
+                    document.getElementById('staff-on-duty').textContent = metrics.staffOnDuty;
+                    document.getElementById('system-status').textContent = metrics.systemsOnline + '%';
+                });
+            }
+
+            function loadCriticalTasks() {
+                var ga = new GlideAjax('GameDayControlCenterAjax');
+                ga.addParam('sysparm_name', 'getCriticalTasks');
+                ga.getXMLAnswer(function(answer) {
+                    document.getElementById('critical-tasks').innerHTML = answer;
+                });
+            }
+
+            function loadRecentIncidents() {
+                var ga = new GlideAjax('GameDayControlCenterAjax');
+                ga.addParam('sysparm_name', 'getRecentIncidents');
+                ga.getXMLAnswer(function(answer) {
+                    document.getElementById('recent-incidents').innerHTML = answer;
+                });
+            }
+
+            function loadStaffAssignments() {
+                var ga = new GlideAjax('GameDayControlCenterAjax');
+                ga.addParam('sysparm_name', 'getStaffAssignments');
+                ga.getXMLAnswer(function(answer) {
+                    document.getElementById('staff-assignments').innerHTML = answer;
+                });
+            }
+
+            // Initialize dashboard
+            document.addEventListener('DOMContentLoaded', function() {
+                refreshDashboard();
+                // Refresh every 30 seconds
+                setInterval(refreshDashboard, 30000);
+            });
+        </script>
+    </body>
+    </html>
+</j:jelly>]]></html>
+        <name>x_som_sports_ops_game_day_control_center</name>
+        <processing_script/>
+        <sys_class_name>sys_ui_page</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>gd001234567890123456789012345678901234gd</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Game Day Control Center</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_ui_page_gd001234567890123456789012345678901234gd</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+    </sys_ui_page>
+</record_update>

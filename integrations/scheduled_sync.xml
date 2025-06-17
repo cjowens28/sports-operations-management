@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sysauto_script">
+    <sysauto_script action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <condition_script/>
+        <conditional>false</conditional>
+        <description>Scheduled job to sync data with external systems</description>
+        <name>Sports Operations External Sync</name>
+        <run_as/>
+        <run_dayofmonth/>
+        <run_dayofweek/>
+        <run_period/>
+        <run_start>2024-01-01 06:00:00</run_start>
+        <run_time>2024-01-01 06:00:00</run_time>
+        <run_type>periodically</run_type>
+        <script><![CDATA[
+// Sports Operations External System Sync
+// Runs every hour to sync data with external systems
+
+try {
+    var apiHandler = new x_som_sports_ops.ExternalAPIHandler();
+    var syncResults = {
+        venues_processed: 0,
+        events_processed: 0,
+        errors: []
+    };
+    
+    gs.log('Starting external systems sync', 'SportsOpsSync');
+    
+    // Get all active venues
+    var venueGR = new GlideRecord('x_som_sports_ops_venue');
+    venueGR.addQuery('active', true);
+    venueGR.query();
+    
+    while (venueGR.next()) {
+        try {
+            syncResults.venues_processed++;
+            
+            // Sync building management system status
+            if (gs.getProperty('x_som_sports_ops.bms.enabled') === 'true') {
+                apiHandler.getBuildingSystemStatus(venueGR.sys_id);
+            }
+            
+            // Check for weather alerts
+            if (gs.getProperty('x_som_sports_ops.weather.enabled') === 'true') {
+                apiHandler.getWeatherAlerts(venueGR.sys_id);
+            }
+            
+            // Sync asset data
+            if (gs.getProperty('x_som_sports_ops.asset.enabled') === 'true') {
+                apiHandler.syncAssetData(venueGR.sys_id);
+            }
+            
+        } catch (venueError) {
+            syncResults.errors.push('Venue ' + venueGR.name + ': ' + venueError.message);
+            gs.error('Error syncing venue ' + venueGR.name + ': ' + venueError.message, 'SportsOpsSync');
+        }
+    }
+    
+    // Get events happening today or in the next 24 hours
+    var eventGR = new GlideRecord('x_som_sports_ops_event');
+    var now = new GlideDateTime();
+    var tomorrow = new GlideDateTime();
+    tomorrow.addDays(1);
+    
+    eventGR.addQuery('start_date', '>=', now);
+    eventGR.addQuery('start_date', '<=', tomorrow);
+    eventGR.addQuery('state', 'IN', 'scheduled,active');
+    eventGR.query();
+    
+    while (eventGR.next()) {
+        try {
+            syncResults.events_processed++;
+            
+            // Sync ticketing data for upcoming events
+            if (gs.getProperty('x_som_sports_ops.ticketing.enabled') === 'true' && 
+                eventGR.external_event_id) {
+                apiHandler.syncTicketingData(eventGR.sys_id);
+            }
+            
+        } catch (eventError) {
+            syncResults.errors.push('Event ' + eventGR.name + ': ' + eventError.message);
+            gs.error('Error syncing event ' + eventGR.name + ': ' + eventError.message, 'SportsOpsSync');
+        }
+    }
+    
+    // Log sync results
+    gs.log('External sync completed. Venues: ' + syncResults.venues_processed + 
+           ', Events: ' + syncResults.events_processed + 
+           ', Errors: ' + syncResults.errors.length, 'SportsOpsSync');
+    
+    // Create sync log record
+    var logGR = new GlideRecord('x_som_sports_ops_sync_log');
+    logGR.initialize();
+    logGR.sync_type = 'external_systems';
+    logGR.sync_time = new GlideDateTime();
+    logGR.venues_processed = syncResults.venues_processed;
+    logGR.events_processed = syncResults.events_processed;
+    logGR.error_count = syncResults.errors.length;
+    logGR.error_details = syncResults.errors.join('\n');
+    logGR.success = syncResults.errors.length === 0;
+    logGR.insert();
+    
+    // Send notification if there were critical errors
+    if (syncResults.errors.length > 5) {
+        var notification = new GlideEmailOutbound();
+        notification.setTo(gs.getProperty('x_som_sports_ops.admin_email'));
+        notification.setSubject('Sports Operations: External Sync Errors');
+        notification.setBody('Multiple errors occurred during external system sync:\n\n' + 
+                           syncResults.errors.join('\n') + '\n\n' +
+                           'Please check the sync logs for details.');
+        notification.send();
+    }
+    
+} catch (mainError) {
+    gs.error('Critical error in external sync job: ' + mainError.message, 'SportsOpsSync');
+    
+    // Send critical error notification
+    var errorNotification = new GlideEmailOutbound();
+    errorNotification.setTo(gs.getProperty('x_som_sports_ops.admin_email'));
+    errorNotification.setSubject('CRITICAL: Sports Operations Sync Failure');
+    errorNotification.setBody('The external systems sync job failed with a critical error:\n\n' + 
+                             mainError.message + '\n\n' +
+                             'Please investigate immediately.');
+    errorNotification.send();
+}
+]]></script>
+        <sys_class_name>sysauto_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>ss001234567890123456789012345678901234ss</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Sports Operations External Sync</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sysauto_script_ss001234567890123456789012345678901234ss</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <upgrade_safe>false</upgrade_safe>
+    </sysauto_script>
+</record_update>

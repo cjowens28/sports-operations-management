@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script">
+    <sys_script action="INSERT_OR_UPDATE">
+        <abort_action>false</abort_action>
+        <access>package_private</access>
+        <action_delete>false</action_delete>
+        <action_insert>true</action_insert>
+        <action_query>false</action_query>
+        <action_update>true</action_update>
+        <active>true</active>
+        <add_message>false</add_message>
+        <advanced>true</advanced>
+        <change_fields>false</change_fields>
+        <client_callable>false</client_callable>
+        <collection>x_som_sports_ops_game_day_task</collection>
+        <condition>current.state.changes() || current.assigned_to.changes()</condition>
+        <description>Sends notifications when game day tasks are assigned or state changes</description>
+        <execute_function>false</execute_function>
+        <filter_condition/>
+        <is_rest>false</is_rest>
+        <message/>
+        <name>Game Day Task Notifications</name>
+        <order>100</order>
+        <priority>100</priority>
+        <rest_method/>
+        <rest_method_text/>
+        <rest_service/>
+        <rest_service_text/>
+        <rest_variables/>
+        <role_conditions/>
+        <script><![CDATA[
+(function executeRule(current, previous /*null when async*/) {
+    
+    // Send notification when task is assigned
+    if (current.assigned_to.changes() && current.assigned_to) {
+        var notification = new GlideRecord('sysevent_email_action');
+        notification.initialize();
+        notification.name = 'Game Day Task Assignment';
+        notification.event_name = 'som.game_day_task.assigned';
+        notification.recipients = current.assigned_to.email;
+        notification.subject = 'Game Day Task Assigned: ' + current.title;
+        notification.message = 'You have been assigned a game day task.\n\n' +
+                              'Event: ' + current.event.name + '\n' +
+                              'Task: ' + current.title + '\n' +
+                              'Due: ' + current.due_date + '\n' +
+                              'Priority: ' + current.priority + '\n\n' +
+                              'Please check the Sports Operations portal for details.';
+        notification.insert();
+        
+        // Fire the event
+        gs.eventQueue('som.game_day_task.assigned', current, current.assigned_to.email, current.title);
+    }
+    
+    // Send notification when task is completed
+    if (current.state.changes() && current.state == 'completed') {
+        var eventGR = new GlideRecord('x_som_sports_ops_event');
+        if (eventGR.get(current.event)) {
+            var notification = new GlideRecord('sysevent_email_action');
+            notification.initialize();
+            notification.name = 'Game Day Task Completed';
+            notification.event_name = 'som.game_day_task.completed';
+            notification.recipients = eventGR.event_coordinator.email;
+            notification.subject = 'Game Day Task Completed: ' + current.title;
+            notification.message = 'A game day task has been completed.\n\n' +
+                                  'Event: ' + eventGR.name + '\n' +
+                                  'Task: ' + current.title + '\n' +
+                                  'Completed by: ' + current.assigned_to.name + '\n' +
+                                  'Completed on: ' + current.sys_updated_on;
+            notification.insert();
+            
+            gs.eventQueue('som.game_day_task.completed', current, eventGR.event_coordinator.email, current.title);
+        }
+    }
+    
+    // Send escalation notification for overdue tasks
+    if (current.state.changes() && current.state == 'overdue') {
+        var notification = new GlideRecord('sysevent_email_action');
+        notification.initialize();
+        notification.name = 'Game Day Task Overdue';
+        notification.event_name = 'som.game_day_task.overdue';
+        notification.recipients = current.assigned_to.email + ',' + current.event.event_coordinator.email;
+        notification.subject = 'OVERDUE: Game Day Task - ' + current.title;
+        notification.message = 'A critical game day task is overdue.\n\n' +
+                              'Event: ' + current.event.name + '\n' +
+                              'Task: ' + current.title + '\n' +
+                              'Assigned to: ' + current.assigned_to.name + '\n' +
+                              'Due date: ' + current.due_date + '\n' +
+                              'Priority: ' + current.priority + '\n\n' +
+                              'This task requires immediate attention.';
+        notification.insert();
+        
+        gs.eventQueue('som.game_day_task.overdue', current, current.assigned_to.email, current.title);
+    }
+    
+})(current, previous);
+]]></script>
+        <sys_class_name>sys_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>br001234567890123456789012345678901234br</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Game Day Task Notifications</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_script_br001234567890123456789012345678901234br</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <template/>
+        <when>async</when>
+    </sys_script>
+</record_update>

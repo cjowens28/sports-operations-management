@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_som_sports_ops.ExternalAPIHandler</api_name>
+        <caller_access/>
+        <client_callable>false</client_callable>
+        <description>Handler for integrating with external sports and venue systems</description>
+        <name>ExternalAPIHandler</name>
+        <script><![CDATA[
+var ExternalAPIHandler = Class.create();
+ExternalAPIHandler.prototype = {
+    
+    initialize: function() {
+        this.timeout = 30000; // 30 seconds
+        this.retryAttempts = 3;
+    },
+    
+    // Integration with Ticketing Systems
+    syncTicketingData: function(eventId) {
+        try {
+            var eventGR = new GlideRecord('x_som_sports_ops_event');
+            if (!eventGR.get(eventId)) {
+                throw new Error('Event not found: ' + eventId);
+            }
+            
+            var ticketingEndpoint = gs.getProperty('x_som_sports_ops.ticketing.endpoint');
+            var apiKey = gs.getProperty('x_som_sports_ops.ticketing.api_key');
+            
+            if (!ticketingEndpoint || !apiKey) {
+                gs.log('Ticketing integration not configured', 'ExternalAPIHandler');
+                return null;
+            }
+            
+            var request = new sn_ws.RESTMessageV2();
+            request.setEndpoint(ticketingEndpoint + '/events/' + eventGR.external_event_id);
+            request.setHttpMethod('GET');
+            request.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+            request.setRequestHeader('Content-Type', 'application/json');
+            
+            var response = request.execute();
+            
+            if (response.getStatusCode() == 200) {
+                var ticketingData = JSON.parse(response.getBody());
+                this._updateEventFromTicketingData(eventGR, ticketingData);
+                return ticketingData;
+            } else {
+                throw new Error('Ticketing API error: ' + response.getStatusCode() + ' - ' + response.getBody());
+            }
+            
+        } catch (e) {
+            gs.error('Error syncing ticketing data: ' + e.message, 'ExternalAPIHandler');
+            return null;
+        }
+    },
+    
+    // Integration with Security Systems
+    sendSecurityAlert: function(incidentId) {
+        try {
+            var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+            if (!incidentGR.get(incidentId)) {
+                throw new Error('Incident not found: ' + incidentId);
+            }
+            
+            if (incidentGR.incident_type != 'security' && incidentGR.incident_type != 'safety') {
+                return; // Only send security alerts for security incidents
+            }
+            
+            var securityEndpoint = gs.getProperty('x_som_sports_ops.security.endpoint');
+            var apiKey = gs.getProperty('x_som_sports_ops.security.api_key');
+            
+            if (!securityEndpoint || !apiKey) {
+                gs.log('Security system integration not configured', 'ExternalAPIHandler');
+                return;
+            }
+            
+            var alertData = {
+                incident_id: incidentGR.number.toString(),
+                type: incidentGR.incident_type.toString(),
+                priority: incidentGR.priority.toString(),
+                location: incidentGR.location.toString(),
+                description: incidentGR.short_description.toString(),
+                timestamp: incidentGR.sys_created_on.toString(),
+                venue_id: incidentGR.venue.toString()
+            };
+            
+            var request = new sn_ws.RESTMessageV2();
+            request.setEndpoint(securityEndpoint + '/alerts');
+            request.setHttpMethod('POST');
+            request.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+            request.setRequestHeader('Content-Type', 'application/json');
+            request.setRequestBody(JSON.stringify(alertData));
+            
+            var response = request.execute();
+            
+            if (response.getStatusCode() == 200 || response.getStatusCode() == 201) {
+                incidentGR.work_notes += '\nSecurity alert sent to external system at ' + new GlideDateTime();
+                incidentGR.update();
+                gs.log('Security alert sent for incident: ' + incidentGR.number, 'ExternalAPIHandler');
+            } else {
+                throw new Error('Security API error: ' + response.getStatusCode());
+            }
+            
+        } catch (e) {
+            gs.error('Error sending security alert: ' + e.message, 'ExternalAPIHandler');
+        }
+    },
+    
+    // Integration with Building Management Systems
+    getBuildingSystemStatus: function(venueId) {
+        try {
+            var venueGR = new GlideRecord('x_som_sports_ops_venue');
+            if (!venueGR.get(venueId)) {
+                throw new Error('Venue not found: ' + venueId);
+            }
+            
+            var bmsEndpoint = gs.getProperty('x_som_sports_ops.bms.endpoint');
+            var apiKey = gs.getProperty('x_som_sports_ops.bms.api_key');
+            
+            if (!bmsEndpoint || !apiKey) {
+                gs.log('Building Management System integration not configured', 'ExternalAPIHandler');
+                return null;
+            }
+            
+            var request = new sn_ws.RESTMessageV2();
+            request.setEndpoint(bmsEndpoint + '/venues/' + venueGR.external_venue_id + '/status');
+            request.setHttpMethod('GET');
+            request.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+            request.setRequestHeader('Content-Type', 'application/json');
+            
+            var response = request.execute();
+            
+            if (response.getStatusCode() == 200) {
+                var systemStatus = JSON.parse(response.getBody());
+                this._updateVenueSystemStatus(venueGR, systemStatus);
+                return systemStatus;
+            } else {
+                throw new Error('BMS API error: ' + response.getStatusCode());
+            }
+            
+        } catch (e) {
+            gs.error('Error getting building system status: ' + e.message, 'ExternalAPIHandler');
+            return null;
+        }
+    },
+    
+    // Integration with Weather Services
+    getWeatherAlerts: function(venueId) {
+        try {
+            var venueGR = new GlideRecord('x_som_sports_ops_venue');
+            if (!venueGR.get(venueId)) {
+                throw new Error('Venue not found: ' + venueId);
+            }
+            
+            var weatherEndpoint = gs.getProperty('x_som_sports_ops.weather.endpoint');
+            var apiKey = gs.getProperty('x_som_sports_ops.weather.api_key');
+            
+            if (!weatherEndpoint || !apiKey) {
+                gs.log('Weather service integration not configured', 'ExternalAPIHandler');
+                return null;
+            }
+            
+            var request = new sn_ws.RESTMessageV2();
+            request.setEndpoint(weatherEndpoint + '/alerts?lat=' + venueGR.latitude + '&lon=' + venueGR.longitude);
+            request.setHttpMethod('GET');
+            request.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+            
+            var response = request.execute();
+            
+            if (response.getStatusCode() == 200) {
+                var weatherData = JSON.parse(response.getBody());
+                this._processWeatherAlerts(venueGR, weatherData);
+                return weatherData;
+            } else {
+                throw new Error('Weather API error: ' + response.getStatusCode());
+            }
+            
+        } catch (e) {
+            gs.error('Error getting weather alerts: ' + e.message, 'ExternalAPIHandler');
+            return null;
+        }
+    },
+    
+    // Integration with Asset Management Systems
+    syncAssetData: function(venueId) {
+        try {
+            var assetEndpoint = gs.getProperty('x_som_sports_ops.asset.endpoint');
+            var apiKey = gs.getProperty('x_som_sports_ops.asset.api_key');
+            
+            if (!assetEndpoint || !apiKey) {
+                gs.log('Asset management integration not configured', 'ExternalAPIHandler');
+                return;
+            }
+            
+            var request = new sn_ws.RESTMessageV2();
+            request.setEndpoint(assetEndpoint + '/venues/' + venueId + '/assets');
+            request.setHttpMethod('GET');
+            request.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+            request.setRequestHeader('Content-Type', 'application/json');
+            
+            var response = request.execute();
+            
+            if (response.getStatusCode() == 200) {
+                var assetData = JSON.parse(response.getBody());
+                this._updateAssetsFromExternalData(venueId, assetData);
+                gs.log('Asset data synchronized for venue: ' + venueId, 'ExternalAPIHandler');
+            } else {
+                throw new Error('Asset API error: ' + response.getStatusCode());
+            }
+            
+        } catch (e) {
+            gs.error('Error syncing asset data: ' + e.message, 'ExternalAPIHandler');
+        }
+    },
+    
+    // Helper Methods
+    _updateEventFromTicketingData: function(eventGR, ticketingData) {
+        if (ticketingData.attendance) {
+            eventGR.actual_attendance = ticketingData.attendance;
+        }
+        if (ticketingData.capacity) {
+            eventGR.venue_capacity = ticketingData.capacity;
+        }
+        if (ticketingData.ticket_sales) {
+            eventGR.tickets_sold = ticketingData.ticket_sales;
+        }
+        eventGR.last_ticketing_sync = new GlideDateTime();
+        eventGR.update();
+    },
+    
+    _updateVenueSystemStatus: function(venueGR, systemStatus) {
+        // Update venue with current system status
+        if (systemStatus.hvac) {
+            venueGR.hvac_status = systemStatus.hvac.status;
+        }
+        if (systemStatus.lighting) {
+            venueGR.lighting_status = systemStatus.lighting.status;
+        }
+        if (systemStatus.audio) {
+            venueGR.audio_status = systemStatus.audio.status;
+        }
+        venueGR.last_bms_sync = new GlideDateTime();
+        venueGR.update();
+        
+        // Create incidents for any system failures
+        this._checkSystemFailures(venueGR, systemStatus);
+    },
+    
+    _processWeatherAlerts: function(venueGR, weatherData) {
+        if (weatherData.alerts && weatherData.alerts.length > 0) {
+            for (var i = 0; i < weatherData.alerts.length; i++) {
+                var alert = weatherData.alerts[i];
+                this._createWeatherIncident(venueGR, alert);
+            }
+        }
+    },
+    
+    _createWeatherIncident: function(venueGR, alert) {
+        // Check if we already have an incident for this alert
+        var existingGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        existingGR.addQuery('external_reference', alert.id);
+        existingGR.query();
+        
+        if (existingGR.hasNext()) {
+            return; // Already exists
+        }
+        
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.initialize();
+        incidentGR.incident_type = 'weather';
+        incidentGR.priority = this._getWeatherPriority(alert.severity);
+        incidentGR.venue = venueGR.sys_id;
+        incidentGR.location = 'Venue Wide';
+        incidentGR.short_description = 'Weather Alert: ' + alert.event;
+        incidentGR.description = alert.description || alert.headline;
+        incidentGR.external_reference = alert.id;
+        incidentGR.caller_id = gs.getProperty('x_som_sports_ops.system_user_id');
+        incidentGR.insert();
+        
+        gs.log('Weather incident created: ' + incidentGR.number + ' for alert: ' + alert.event, 'ExternalAPIHandler');
+    },
+    
+    _getWeatherPriority: function(severity) {
+        switch (severity.toLowerCase()) {
+            case 'extreme':
+                return '1';
+            case 'severe':
+                return '2';
+            case 'moderate':
+                return '3';
+            default:
+                return '4';
+        }
+    },
+    
+    _checkSystemFailures: function(venueGR, systemStatus) {
+        var systems = ['hvac', 'lighting', 'audio', 'video', 'network'];
+        
+        for (var i = 0; i < systems.length; i++) {
+            var system = systems[i];
+            if (systemStatus[system] && systemStatus[system].status === 'failure') {
+                this._createSystemFailureIncident(venueGR, system, systemStatus[system]);
+            }
+        }
+    },
+    
+    _createSystemFailureIncident: function(venueGR, systemName, systemData) {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.initialize();
+        incidentGR.incident_type = 'technical';
+        incidentGR.priority = '2'; // High priority for system failures
+        incidentGR.venue = venueGR.sys_id;
+        incidentGR.location = systemData.location || 'Technical Room';
+        incidentGR.short_description = systemName.toUpperCase() + ' System Failure';
+        incidentGR.description = 'Automatic incident created from building management system.\n\n' +
+                                'System: ' + systemName + '\n' +
+                                'Status: ' + systemData.status + '\n' +
+                                'Error: ' + (systemData.error || 'Unknown error') + '\n' +
+                                'Detected: ' + new GlideDateTime();
+        incidentGR.caller_id = gs.getProperty('x_som_sports_ops.system_user_id');
+        incidentGR.assignment_group = 'Technical Support';
+        incidentGR.insert();
+        
+        gs.log('System failure incident created: ' + incidentGR.number + ' for ' + systemName, 'ExternalAPIHandler');
+    },
+
+    type: 'ExternalAPIHandler'
+};
+]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>ea001234567890123456789012345678901234ea</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>ExternalAPIHandler</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_script_include_ea001234567890123456789012345678901234ea</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+    </sys_script_include>
+</record_update>

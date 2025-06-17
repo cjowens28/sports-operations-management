@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script">
+    <sys_script action="INSERT_OR_UPDATE">
+        <abort_action>false</abort_action>
+        <access>package_private</access>
+        <action_delete>false</action_delete>
+        <action_insert>false</action_insert>
+        <action_query>false</action_query>
+        <action_update>false</action_update>
+        <active>true</active>
+        <add_message>false</add_message>
+        <advanced>true</advanced>
+        <change_fields>false</change_fields>
+        <client_callable>false</client_callable>
+        <collection>x_som_sports_ops_facility_asset</collection>
+        <condition/>
+        <description>Scheduled job to create preventive maintenance requests</description>
+        <execute_function>false</execute_function>
+        <filter_condition/>
+        <is_rest>false</is_rest>
+        <message/>
+        <name>Preventive Maintenance Scheduler</name>
+        <order>100</order>
+        <priority>100</priority>
+        <rest_method/>
+        <rest_method_text/>
+        <rest_service/>
+        <rest_service_text/>
+        <rest_variables/>
+        <role_conditions/>
+        <script><![CDATA[
+var PreventiveMaintenanceScheduler = Class.create();
+PreventiveMaintenanceScheduler.prototype = {
+    
+    initialize: function() {
+    },
+    
+    createPreventiveMaintenanceRequests: function() {
+        var assetGR = new GlideRecord('x_som_sports_ops_facility_asset');
+        assetGR.addQuery('preventive_maintenance_enabled', true);
+        assetGR.addQuery('active', true);
+        assetGR.query();
+        
+        while (assetGR.next()) {
+            if (this._isPMDue(assetGR)) {
+                this._createPMRequest(assetGR);
+            }
+        }
+    },
+    
+    _isPMDue: function(assetGR) {
+        var lastPM = assetGR.last_preventive_maintenance;
+        var pmInterval = assetGR.pm_interval_days || 30;
+        
+        if (!lastPM) {
+            return true; // First PM
+        }
+        
+        var lastPMDate = new GlideDateTime(lastPM);
+        var currentDate = new GlideDateTime();
+        var daysDiff = GlideDateTime.subtract(currentDate, lastPMDate).getDayPart();
+        
+        return daysDiff >= pmInterval;
+    },
+    
+    _createPMRequest: function(assetGR) {
+        var mrGR = new GlideRecord('x_som_sports_ops_maintenance_request');
+        mrGR.initialize();
+        mrGR.asset = assetGR.sys_id;
+        mrGR.venue = assetGR.venue;
+        mrGR.request_type = 'preventive';
+        mrGR.priority = 'medium';
+        mrGR.state = 'new';
+        mrGR.short_description = 'Preventive Maintenance: ' + assetGR.name;
+        mrGR.description = 'Scheduled preventive maintenance for ' + assetGR.name + 
+                          ' (' + assetGR.asset_tag + ').\n\n' +
+                          'Asset Type: ' + assetGR.asset_type + '\n' +
+                          'Location: ' + assetGR.location + '\n' +
+                          'Last PM: ' + (assetGR.last_preventive_maintenance || 'Never') + '\n\n' +
+                          'Standard PM tasks:\n' +
+                          assetGR.pm_checklist;
+        mrGR.requested_for = assetGR.responsible_user;
+        mrGR.assignment_group = assetGR.maintenance_group;
+        mrGR.due_date = this._calculateDueDate(assetGR.priority);
+        mrGR.insert();
+        
+        // Update asset last PM request date
+        assetGR.last_pm_request = new GlideDateTime();
+        assetGR.update();
+        
+        gs.log('Created preventive maintenance request for asset: ' + assetGR.name, 'PreventiveMaintenanceScheduler');
+    },
+    
+    _calculateDueDate: function(priority) {
+        var dueDate = new GlideDateTime();
+        var daysToAdd = 3; // Default
+        
+        switch (priority) {
+            case 'critical':
+                daysToAdd = 1;
+                break;
+            case 'high':
+                daysToAdd = 2;
+                break;
+            case 'medium':
+                daysToAdd = 5;
+                break;
+            case 'low':
+                daysToAdd = 7;
+                break;
+        }
+        
+        dueDate.addDaysUTC(daysToAdd);
+        return dueDate;
+    },
+    
+    type: 'PreventiveMaintenanceScheduler'
+};
+]]></script>
+        <sys_class_name>sys_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>pm001234567890123456789012345678901234pm</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Preventive Maintenance Scheduler</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_script_pm001234567890123456789012345678901234pm</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <template/>
+        <when>manual</when>
+    </sys_script>
+</record_update>

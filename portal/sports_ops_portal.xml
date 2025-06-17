@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sp_portal">
+    <sp_portal action="INSERT_OR_UPDATE">
+        <access_control/>
+        <custom_login_page/>
+        <description>Sports Operations Management Portal - Mobile-optimized interface for venue staff</description>
+        <enable_request_timeout>false</enable_request_timeout>
+        <homepage display_value="Sports Operations Home">sp001234567890123456789012345678901234sp</homepage>
+        <kb_knowledge_base/>
+        <login_page/>
+        <logo/>
+        <mapped_sp_portal/>
+        <name>Sports Operations Portal</name>
+        <name_slug>sports-ops</name_slug>
+        <order>100</order>
+        <quick_start_config/>
+        <sc_catalog/>
+        <sc_category/>
+        <show_kb_shortcut>false</show_kb_shortcut>
+        <show_sc_shortcut>false</show_sc_shortcut>
+        <sys_class_name>sp_portal</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>po001234567890123456789012345678901234po</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Sports Operations Portal</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sp_portal_po001234567890123456789012345678901234po</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <theme display_value="Stock Theme">sp_theme_stock</theme>
+        <title>Sports Operations</title>
+        <url_suffix>sports-ops</url_suffix>
+    </sp_portal>
+</record_update>

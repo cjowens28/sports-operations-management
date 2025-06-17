@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_report">
+    <sys_report action="INSERT_OR_UPDATE">
+        <chart_type>pie</chart_type>
+        <description>Executive dashboard showing key sports operations metrics</description>
+        <field>state</field>
+        <filter/>
+        <group_by_field/>
+        <name>Sports Operations Executive Dashboard</name>
+        <report_source>table</report_source>
+        <roles/>
+        <show_empty>true</show_empty>
+        <sys_class_name>sys_report</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>rp001234567890123456789012345678901234rp</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Sports Operations Executive Dashboard</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_report_rp001234567890123456789012345678901234rp</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <table>x_som_sports_ops_sports_incident</table>
+        <title>Incident Status Distribution</title>
+        <type>pie</type>
+    </sys_report>
+</record_update>

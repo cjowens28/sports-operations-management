@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sp_widget">
+    <sp_widget action="INSERT_OR_UPDATE">
+        <category>custom</category>
+        <client_script><![CDATA[
+api.controller = function($scope, $location, spUtil, $timeout) {
+    var c = this;
+    
+    // Initialize form data
+    c.data = {
+        incident_type: '',
+        priority: '3',
+        location: '',
+        short_description: '',
+        description: '',
+        venue: c.options.venue_id || ''
+    };
+    
+    // Form validation
+    c.isValid = function() {
+        return c.data.incident_type && 
+               c.data.short_description && 
+               c.data.description && 
+               c.data.location;
+    };
+    
+    // Submit incident
+    c.submitIncident = function() {
+        if (!c.isValid()) {
+            spUtil.addErrorMessage('Please fill in all required fields');
+            return;
+        }
+        
+        c.submitting = true;
+        c.server.get({
+            action: 'create_incident',
+            data: c.data
+        }).then(function(response) {
+            c.submitting = false;
+            if (response.data.success) {
+                spUtil.addInfoMessage('Incident ' + response.data.number + ' created successfully');
+                c.resetForm();
+                $timeout(function() {
+                    $location.path('/incidents');
+                }, 2000);
+            } else {
+                spUtil.addErrorMessage('Error creating incident: ' + response.data.error);
+            }
+        });
+    };
+    
+    // Reset form
+    c.resetForm = function() {
+        c.data = {
+            incident_type: '',
+            priority: '3',
+            location: '',
+            short_description: '',
+            description: '',
+            venue: c.options.venue_id || ''
+        };
+    };
+    
+    // Get current location
+    c.getCurrentLocation = function() {
+        if (navigator.geolocation) {
+            c.gettingLocation = true;
+            navigator.geolocation.getCurrentPosition(function(position) {
+                c.gettingLocation = false;
+                c.data.location = 'GPS: ' + position.coords.latitude + ', ' + position.coords.longitude;
+                $scope.$apply();
+            }, function(error) {
+                c.gettingLocation = false;
+                spUtil.addErrorMessage('Unable to get current location');
+                $scope.$apply();
+            });
+        }
+    };
+    
+    // Quick location buttons
+    c.setQuickLocation = function(location) {
+        c.data.location = location;
+    };
+    
+    // Priority colors
+    c.getPriorityClass = function(priority) {
+        switch(priority) {
+            case '1': return 'priority-critical';
+            case '2': return 'priority-high';
+            case '3': return 'priority-medium';
+            case '4': return 'priority-low';
+            default: return '';
+        }
+    };
+};
+]]></client_script>
+        <controller_as>c</controller_as>
+        <css><![CDATA[
+.incident-reporter {
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0,123,255,.25);
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.priority-selector {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.priority-btn {
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+    padding: 10px;
+    border: 2px solid #ddd;
+    background: white;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.priority-btn.active {
+    border-color: #007bff;
+    background-color: #e7f3ff;
+}
+
+.priority-critical { border-color: #dc3545 !important; }
+.priority-high { border-color: #fd7e14 !important; }
+.priority-medium { border-color: #ffc107 !important; }
+.priority-low { border-color: #28a745 !important; }
+
+.location-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.location-btn {
+    padding: 8px 16px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.location-btn:hover {
+    background: #e9ecef;
+}
+
+.required {
+    color: red;
+}
+
+@media (max-width: 768px) {
+    .incident-reporter {
+        padding: 15px;
+    }
+    
+    .priority-selector {
+        flex-direction: column;
+    }
+    
+    .priority-btn {
+        margin-bottom: 5px;
+    }
+}
+]]></css>
+        <data_table>sp_instance</data_table>
+        <demo_data/>
+        <description>Mobile-optimized incident reporting widget for sports venue staff</description>
+        <docs/>
+        <field_list/>
+        <has_preview>true</has_preview>
+        <id>incident_reporter</id>
+        <internal>false</internal>
+        <link/>
+        <name>Incident Reporter</name>
+        <option_schema/>
+        <public>false</public>
+        <roles/>
+        <script><![CDATA[
+(function() {
+    // Server-side script for incident reporter widget
+    
+    data.incident_types = [
+        {value: 'technical', label: 'Technical/Equipment'},
+        {value: 'facility', label: 'Facility/Infrastructure'},
+        {value: 'safety', label: 'Safety Concern'},
+        {value: 'security', label: 'Security Issue'},
+        {value: 'medical', label: 'Medical Emergency'},
+        {value: 'crowd_control', label: 'Crowd Control'},
+        {value: 'weather', label: 'Weather Related'},
+        {value: 'other', label: 'Other'}
+    ];
+    
+    data.quick_locations = [
+        'Main Entrance',
+        'Concourse Level 1',
+        'Concourse Level 2', 
+        'Field/Court Level',
+        'Press Box',
+        'Concession Area',
+        'Restrooms',
+        'Parking Lot',
+        'Loading Dock',
+        'Equipment Room'
+    ];
+    
+    // Handle form submission
+    if (input && input.action === 'create_incident') {
+        var incidentData = input.data;
+        
+        try {
+            var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+            incidentGR.initialize();
+            
+            // Set basic fields
+            incidentGR.incident_type = incidentData.incident_type;
+            incidentGR.priority = incidentData.priority;
+            incidentGR.location = incidentData.location;
+            incidentGR.short_description = incidentData.short_description;
+            incidentGR.description = incidentData.description;
+            incidentGR.venue = incidentData.venue;
+            
+            // Set reporter information
+            incidentGR.caller_id = gs.getUserID();
+            incidentGR.opened_by = gs.getUserID();
+            
+            // Set initial state
+            incidentGR.state = '1'; // New
+            incidentGR.category = 'Sports Operations';
+            incidentGR.subcategory = incidentData.incident_type;
+            
+            // Set assignment based on incident type
+            var assignmentGroup = getAssignmentGroup(incidentData.incident_type);
+            if (assignmentGroup) {
+                incidentGR.assignment_group = assignmentGroup;
+            }
+            
+            // Insert the incident
+            var sysId = incidentGR.insert();
+            
+            if (sysId) {
+                data.success = true;
+                data.number = incidentGR.number.toString();
+                data.sys_id = sysId;
+                
+                // Log the creation
+                gs.log('Mobile incident created: ' + incidentGR.number + ' by ' + gs.getUserName(), 'SportsMobilePortal');
+            } else {
+                data.success = false;
+                data.error = 'Failed to create incident record';
+            }
+            
+        } catch (e) {
+            data.success = false;
+            data.error = e.message;
+            gs.error('Error creating mobile incident: ' + e.message, 'SportsMobilePortal');
+        }
+    }
+    
+    function getAssignmentGroup(incidentType) {
+        var groupMap = {
+            'technical': 'Technical Support',
+            'facility': 'Facilities Management', 
+            'safety': 'Safety & Security',
+            'security': 'Security Team',
+            'medical': 'Medical Team',
+            'crowd_control': 'Security Team',
+            'weather': 'Operations Management',
+            'other': 'General Operations'
+        };
+        
+        var groupName = groupMap[incidentType];
+        if (groupName) {
+            var groupGR = new GlideRecord('sys_user_group');
+            groupGR.addQuery('name', groupName);
+            groupGR.query();
+            if (groupGR.next()) {
+                return groupGR.sys_id;
+            }
+        }
+        return null;
+    }
+    
+})();
+]]></script>
+        <servicenow>false</servicenow>
+        <sys_class_name>sp_widget</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>wi001234567890123456789012345678901234wi</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Incident Reporter</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sp_widget_wi001234567890123456789012345678901234wi</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+        <template><![CDATA[
+<div class="incident-reporter">
+    <h2>Report an Incident</h2>
+    <p class="text-muted">Quickly report issues during events</p>
+    
+    <form ng-submit="c.submitIncident()" novalidate>
+        <!-- Incident Type -->
+        <div class="form-group">
+            <label for="incident_type">Incident Type <span class="required">*</span></label>
+            <select id="incident_type" class="form-control" ng-model="c.data.incident_type" required>
+                <option value="">Select incident type...</option>
+                <option ng-repeat="type in data.incident_types" value="{{type.value}}">{{type.label}}</option>
+            </select>
+        </div>
+        
+        <!-- Priority -->
+        <div class="form-group">
+            <label>Priority <span class="required">*</span></label>
+            <div class="priority-selector">
+                <div class="priority-btn priority-critical" 
+                     ng-class="{'active': c.data.priority === '1'}"
+                     ng-click="c.data.priority = '1'">
+                    Critical
+                </div>
+                <div class="priority-btn priority-high" 
+                     ng-class="{'active': c.data.priority === '2'}"
+                     ng-click="c.data.priority = '2'">
+                    High
+                </div>
+                <div class="priority-btn priority-medium" 
+                     ng-class="{'active': c.data.priority === '3'}"
+                     ng-click="c.data.priority = '3'">
+                    Medium
+                </div>
+                <div class="priority-btn priority-low" 
+                     ng-class="{'active': c.data.priority === '4'}"
+                     ng-click="c.data.priority = '4'">
+                    Low
+                </div>
+            </div>
+        </div>
+        
+        <!-- Location -->
+        <div class="form-group">
+            <label for="location">Location <span class="required">*</span></label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input id="location" type="text" class="form-control" ng-model="c.data.location" 
+                       placeholder="Enter specific location..." required style="flex: 1;">
+                <button type="button" class="btn btn-secondary" ng-click="c.getCurrentLocation()" 
+                        ng-disabled="c.gettingLocation">
+                    <span ng-if="!c.gettingLocation">📍 GPS</span>
+                    <span ng-if="c.gettingLocation">Getting...</span>
+                </button>
+            </div>
+            <div class="location-buttons">
+                <span class="location-btn" ng-repeat="loc in data.quick_locations" 
+                      ng-click="c.setQuickLocation(loc)">{{loc}}</span>
+            </div>
+        </div>
+        
+        <!-- Short Description -->
+        <div class="form-group">
+            <label for="short_description">Brief Description <span class="required">*</span></label>
+            <input id="short_description" type="text" class="form-control" ng-model="c.data.short_description" 
+                   placeholder="Brief summary of the incident..." maxlength="160" required>
+        </div>
+        
+        <!-- Detailed Description -->
+        <div class="form-group">
+            <label for="description">Detailed Description <span class="required">*</span></label>
+            <textarea id="description" class="form-control" ng-model="c.data.description" 
+                      placeholder="Provide detailed information about the incident..." rows="4" required></textarea>
+        </div>
+        
+        <!-- Submit Buttons -->
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary" ng-disabled="!c.isValid() || c.submitting">
+                <span ng-if="!c.submitting">Submit Incident</span>
+                <span ng-if="c.submitting">Submitting...</span>
+            </button>
+            <button type="button" class="btn btn-secondary" ng-click="c.resetForm()">Clear Form</button>
+        </div>
+    </form>
+</div>
+]]></template>
+        <ts/>
+    </sp_widget>
+</record_update>

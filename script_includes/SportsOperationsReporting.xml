@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_som_sports_ops.SportsOperationsReporting</api_name>
+        <caller_access/>
+        <client_callable>true</client_callable>
+        <description>Comprehensive reporting utilities for sports operations analytics</description>
+        <name>SportsOperationsReporting</name>
+        <script><![CDATA[
+var SportsOperationsReporting = Class.create();
+SportsOperationsReporting.prototype = Object.extendsObject(AbstractAjaxProcessor, {
+    
+    getEventMetrics: function() {
+        var eventId = this.getParameter('event_id');
+        var startDate = this.getParameter('start_date');
+        var endDate = this.getParameter('end_date');
+        
+        var metrics = {
+            totalEvents: this._getTotalEvents(startDate, endDate),
+            totalIncidents: this._getTotalIncidents(startDate, endDate, eventId),
+            avgResponseTime: this._getAverageResponseTime(startDate, endDate, eventId),
+            staffUtilization: this._getStaffUtilization(startDate, endDate, eventId),
+            maintenanceRequests: this._getMaintenanceRequests(startDate, endDate, eventId),
+            eventEfficiency: this._getEventEfficiency(startDate, endDate, eventId)
+        };
+        
+        return JSON.stringify(metrics);
+    },
+    
+    getIncidentAnalytics: function() {
+        var startDate = this.getParameter('start_date');
+        var endDate = this.getParameter('end_date');
+        var venueId = this.getParameter('venue_id');
+        
+        var analytics = {
+            incidentsByType: this._getIncidentsByType(startDate, endDate, venueId),
+            incidentsByPriority: this._getIncidentsByPriority(startDate, endDate, venueId),
+            incidentsByLocation: this._getIncidentsByLocation(startDate, endDate, venueId),
+            resolutionTimes: this._getResolutionTimes(startDate, endDate, venueId),
+            escalationRate: this._getEscalationRate(startDate, endDate, venueId),
+            recurringIssues: this._getRecurringIssues(startDate, endDate, venueId)
+        };
+        
+        return JSON.stringify(analytics);
+    },
+    
+    getOperationalKPIs: function() {
+        var startDate = this.getParameter('start_date');
+        var endDate = this.getParameter('end_date');
+        var venueId = this.getParameter('venue_id');
+        
+        var kpis = {
+            incidentResponseTime: this._calculateIncidentResponseKPI(startDate, endDate, venueId),
+            maintenanceEfficiency: this._calculateMaintenanceKPI(startDate, endDate, venueId),
+            staffProductivity: this._calculateStaffProductivityKPI(startDate, endDate, venueId),
+            eventReadiness: this._calculateEventReadinessKPI(startDate, endDate, venueId),
+            customerSatisfaction: this._calculateCustomerSatisfactionKPI(startDate, endDate, venueId),
+            costPerEvent: this._calculateCostPerEventKPI(startDate, endDate, venueId)
+        };
+        
+        return JSON.stringify(kpis);
+    },
+    
+    generateEventReport: function() {
+        var eventId = this.getParameter('event_id');
+        var eventGR = new GlideRecord('x_som_sports_ops_event');
+        
+        if (!eventGR.get(eventId)) {
+            return JSON.stringify({error: 'Event not found'});
+        }
+        
+        var report = {
+            eventInfo: this._getEventInfo(eventGR),
+            staffSummary: this._getEventStaffSummary(eventId),
+            incidentSummary: this._getEventIncidentSummary(eventId),
+            maintenanceSummary: this._getEventMaintenanceSummary(eventId),
+            timeline: this._getEventTimeline(eventId),
+            recommendations: this._getEventRecommendations(eventId)
+        };
+        
+        return JSON.stringify(report);
+    },
+    
+    _getTotalEvents: function(startDate, endDate) {
+        var eventGR = new GlideRecord('x_som_sports_ops_event');
+        if (startDate) eventGR.addQuery('start_date', '>=', startDate);
+        if (endDate) eventGR.addQuery('start_date', '<=', endDate);
+        eventGR.query();
+        return eventGR.getRowCount();
+    },
+    
+    _getTotalIncidents: function(startDate, endDate, eventId) {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        if (startDate) incidentGR.addQuery('sys_created_on', '>=', startDate);
+        if (endDate) incidentGR.addQuery('sys_created_on', '<=', endDate);
+        if (eventId) incidentGR.addQuery('event', eventId);
+        incidentGR.query();
+        return incidentGR.getRowCount();
+    },
+    
+    _getAverageResponseTime: function(startDate, endDate, eventId) {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.addQuery('state', '>=', '2'); // In progress or resolved
+        if (startDate) incidentGR.addQuery('sys_created_on', '>=', startDate);
+        if (endDate) incidentGR.addQuery('sys_created_on', '<=', endDate);
+        if (eventId) incidentGR.addQuery('event', eventId);
+        incidentGR.query();
+        
+        var totalResponseTime = 0;
+        var count = 0;
+        
+        while (incidentGR.next()) {
+            if (incidentGR.first_response_time) {
+                var created = new GlideDateTime(incidentGR.sys_created_on);
+                var firstResponse = new GlideDateTime(incidentGR.first_response_time);
+                var responseTime = GlideDateTime.subtract(firstResponse, created);
+                totalResponseTime += responseTime.getNumericValue();
+                count++;
+            }
+        }
+        
+        return count > 0 ? (totalResponseTime / count / (1000 * 60)) : 0; // Average in minutes
+    },
+    
+    _getStaffUtilization: function(startDate, endDate, eventId) {
+        var assignmentGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+        if (startDate) assignmentGR.addQuery('shift_start', '>=', startDate);
+        if (endDate) assignmentGR.addQuery('shift_end', '<=', endDate);
+        if (eventId) assignmentGR.addQuery('event', eventId);
+        assignmentGR.query();
+        
+        var totalHours = 0;
+        var assignedHours = 0;
+        
+        while (assignmentGR.next()) {
+            var start = new GlideDateTime(assignmentGR.shift_start);
+            var end = new GlideDateTime(assignmentGR.shift_end);
+            var duration = GlideDateTime.subtract(end, start).getNumericValue() / (1000 * 60 * 60);
+            
+            totalHours += duration;
+            if (assignmentGR.staff_member) {
+                assignedHours += duration;
+            }
+        }
+        
+        return totalHours > 0 ? (assignedHours / totalHours * 100) : 0;
+    },
+    
+    _getIncidentsByType: function(startDate, endDate, venueId) {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        if (startDate) incidentGR.addQuery('sys_created_on', '>=', startDate);
+        if (endDate) incidentGR.addQuery('sys_created_on', '<=', endDate);
+        if (venueId) incidentGR.addQuery('venue', venueId);
+        incidentGR.query();
+        
+        var typeCount = {};
+        while (incidentGR.next()) {
+            var type = incidentGR.incident_type.toString();
+            typeCount[type] = (typeCount[type] || 0) + 1;
+        }
+        
+        return typeCount;
+    },
+    
+    _getIncidentsByPriority: function(startDate, endDate, venueId) {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        if (startDate) incidentGR.addQuery('sys_created_on', '>=', startDate);
+        if (endDate) incidentGR.addQuery('sys_created_on', '<=', endDate);
+        if (venueId) incidentGR.addQuery('venue', venueId);
+        incidentGR.query();
+        
+        var priorityCount = {};
+        while (incidentGR.next()) {
+            var priority = incidentGR.priority.toString();
+            priorityCount[priority] = (priorityCount[priority] || 0) + 1;
+        }
+        
+        return priorityCount;
+    },
+    
+    _calculateIncidentResponseKPI: function(startDate, endDate, venueId) {
+        var avgResponseTime = this._getAverageResponseTime(startDate, endDate, null);
+        var targetResponseTime = 15; // 15 minutes target
+        
+        var score = Math.max(0, Math.min(100, (targetResponseTime / Math.max(avgResponseTime, 1)) * 100));
+        
+        return {
+            score: Math.round(score),
+            actual: Math.round(avgResponseTime),
+            target: targetResponseTime,
+            unit: 'minutes'
+        };
+    },
+    
+    _calculateMaintenanceKPI: function(startDate, endDate, venueId) {
+        var mrGR = new GlideRecord('x_som_sports_ops_maintenance_request');
+        if (startDate) mrGR.addQuery('sys_created_on', '>=', startDate);
+        if (endDate) mrGR.addQuery('sys_created_on', '<=', endDate);
+        if (venueId) mrGR.addQuery('venue', venueId);
+        mrGR.query();
+        
+        var total = 0;
+        var onTime = 0;
+        
+        while (mrGR.next()) {
+            total++;
+            if (mrGR.state == 'completed' && mrGR.completed_on <= mrGR.due_date) {
+                onTime++;
+            }
+        }
+        
+        var score = total > 0 ? (onTime / total * 100) : 100;
+        
+        return {
+            score: Math.round(score),
+            completed: onTime,
+            total: total,
+            unit: 'percentage'
+        };
+    },
+    
+    _getEventInfo: function(eventGR) {
+        return {
+            name: eventGR.name.toString(),
+            venue: eventGR.venue.getDisplayValue(),
+            date: eventGR.start_date.getDisplayValue(),
+            type: eventGR.event_type.toString(),
+            capacity: eventGR.expected_attendance.toString(),
+            status: eventGR.state.getDisplayValue()
+        };
+    },
+    
+    _getEventStaffSummary: function(eventId) {
+        var assignmentGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+        assignmentGR.addQuery('event', eventId);
+        assignmentGR.query();
+        
+        var total = 0;
+        var assigned = 0;
+        var confirmed = 0;
+        
+        while (assignmentGR.next()) {
+            total++;
+            if (assignmentGR.staff_member) {
+                assigned++;
+                if (assignmentGR.status == 'confirmed') {
+                    confirmed++;
+                }
+            }
+        }
+        
+        return {
+            totalPositions: total,
+            assigned: assigned,
+            confirmed: confirmed,
+            fillRate: total > 0 ? Math.round((assigned / total) * 100) : 0
+        };
+    },
+    
+    _getEventIncidentSummary: function(eventId) {
+        var incidentGR = new GlideRecord('x_som_sports_ops_sports_incident');
+        incidentGR.addQuery('event', eventId);
+        incidentGR.query();
+        
+        var total = 0;
+        var resolved = 0;
+        var critical = 0;
+        
+        while (incidentGR.next()) {
+            total++;
+            if (incidentGR.state >= '6') resolved++;
+            if (incidentGR.priority == '1') critical++;
+        }
+        
+        return {
+            total: total,
+            resolved: resolved,
+            critical: critical,
+            resolutionRate: total > 0 ? Math.round((resolved / total) * 100) : 0
+        };
+    },
+
+    type: 'SportsOperationsReporting'
+});
+]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>sr001234567890123456789012345678901234sr</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>SportsOperationsReporting</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_script_include_sr001234567890123456789012345678901234sr</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+    </sys_script_include>
+</record_update>

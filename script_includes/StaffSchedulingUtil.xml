@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_som_sports_ops.StaffSchedulingUtil</api_name>
+        <caller_access/>
+        <client_callable>false</client_callable>
+        <description>Utility functions for staff scheduling and resource management</description>
+        <name>StaffSchedulingUtil</name>
+        <script><![CDATA[
+var StaffSchedulingUtil = Class.create();
+StaffSchedulingUtil.prototype = {
+    
+    initialize: function() {
+    },
+    
+    createEventSchedule: function(eventId, templateId) {
+        var eventGR = new GlideRecord('x_som_sports_ops_event');
+        if (!eventGR.get(eventId)) {
+            gs.error('Event not found: ' + eventId);
+            return false;
+        }
+        
+        var templateGR = new GlideRecord('x_som_sports_ops_schedule_template');
+        if (!templateGR.get(templateId)) {
+            gs.error('Schedule template not found: ' + templateId);
+            return false;
+        }
+        
+        return this._createScheduleFromTemplate(eventGR, templateGR);
+    },
+    
+    _createScheduleFromTemplate: function(eventGR, templateGR) {
+        var templateRoleGR = new GlideRecord('x_som_sports_ops_template_role');
+        templateRoleGR.addQuery('template', templateGR.sys_id);
+        templateRoleGR.query();
+        
+        var assignmentsCreated = 0;
+        
+        while (templateRoleGR.next()) {
+            var staffCount = parseInt(templateRoleGR.staff_count) || 1;
+            
+            for (var i = 0; i < staffCount; i++) {
+                var assignmentGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+                assignmentGR.initialize();
+                assignmentGR.event = eventGR.sys_id;
+                assignmentGR.role = templateRoleGR.role;
+                assignmentGR.location = templateRoleGR.location;
+                assignmentGR.shift_start = this._calculateShiftStart(eventGR, templateRoleGR);
+                assignmentGR.shift_end = this._calculateShiftEnd(eventGR, templateRoleGR);
+                assignmentGR.requirements = templateRoleGR.requirements;
+                assignmentGR.status = 'draft';
+                assignmentGR.insert();
+                assignmentsCreated++;
+            }
+        }
+        
+        gs.info('Created ' + assignmentsCreated + ' staff assignments for event: ' + eventGR.name);
+        return true;
+    },
+    
+    _calculateShiftStart: function(eventGR, templateRoleGR) {
+        var eventStart = new GlideDateTime(eventGR.start_date);
+        var offsetHours = parseInt(templateRoleGR.pre_event_hours) || 0;
+        eventStart.addHours(-offsetHours);
+        return eventStart;
+    },
+    
+    _calculateShiftEnd: function(eventGR, templateRoleGR) {
+        var eventEnd = new GlideDateTime(eventGR.end_date);
+        var offsetHours = parseInt(templateRoleGR.post_event_hours) || 0;
+        eventEnd.addHours(offsetHours);
+        return eventEnd;
+    },
+    
+    assignStaffToRole: function(assignmentId, staffMemberId) {
+        var assignmentGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+        if (!assignmentGR.get(assignmentId)) {
+            return false;
+        }
+        
+        var staffGR = new GlideRecord('sys_user');
+        if (!staffGR.get(staffMemberId)) {
+            return false;
+        }
+        
+        // Check availability
+        if (!this._checkStaffAvailability(staffMemberId, assignmentGR.shift_start, assignmentGR.shift_end)) {
+            gs.error('Staff member is not available for the requested time slot');
+            return false;
+        }
+        
+        assignmentGR.staff_member = staffMemberId;
+        assignmentGR.status = 'assigned';
+        assignmentGR.assigned_date = new GlideDateTime();
+        assignmentGR.update();
+        
+        // Send notification
+        this._sendAssignmentNotification(assignmentGR);
+        
+        return true;
+    },
+    
+    _checkStaffAvailability: function(staffId, startTime, endTime) {
+        var conflictGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+        conflictGR.addQuery('staff_member', staffId);
+        conflictGR.addQuery('status', 'IN', 'assigned,confirmed');
+        conflictGR.addQuery('shift_start', '<=', endTime);
+        conflictGR.addQuery('shift_end', '>=', startTime);
+        conflictGR.query();
+        
+        return !conflictGR.hasNext();
+    },
+    
+    _sendAssignmentNotification: function(assignmentGR) {
+        var staffGR = new GlideRecord('sys_user');
+        if (staffGR.get(assignmentGR.staff_member)) {
+            var eventGR = new GlideRecord('x_som_sports_ops_event');
+            eventGR.get(assignmentGR.event);
+            
+            var email = new GlideEmailOutbound();
+            email.setTo(staffGR.email);
+            email.setSubject('Staff Assignment: ' + eventGR.name);
+            email.setBody(this._buildAssignmentEmailBody(assignmentGR, eventGR, staffGR));
+            email.send();
+        }
+    },
+    
+    _buildAssignmentEmailBody: function(assignmentGR, eventGR, staffGR) {
+        var body = 'Dear ' + staffGR.first_name + ',\n\n';
+        body += 'You have been assigned to work at the following event:\n\n';
+        body += 'Event: ' + eventGR.name + '\n';
+        body += 'Date: ' + eventGR.start_date.getDisplayValue() + '\n';
+        body += 'Role: ' + assignmentGR.role.getDisplayValue() + '\n';
+        body += 'Location: ' + assignmentGR.location + '\n';
+        body += 'Shift: ' + assignmentGR.shift_start.getDisplayValue() + ' - ' + assignmentGR.shift_end.getDisplayValue() + '\n\n';
+        
+        if (assignmentGR.requirements) {
+            body += 'Requirements:\n' + assignmentGR.requirements + '\n\n';
+        }
+        
+        body += 'Please confirm your availability by accessing the Sports Operations portal.\n\n';
+        body += 'Thank you,\nSports Operations Team';
+        
+        return body;
+    },
+    
+    generateScheduleReport: function(eventId) {
+        var eventGR = new GlideRecord('x_som_sports_ops_event');
+        if (!eventGR.get(eventId)) {
+            return '';
+        }
+        
+        var report = 'Staff Schedule Report\n';
+        report += 'Event: ' + eventGR.name + '\n';
+        report += 'Date: ' + eventGR.start_date.getDisplayValue() + '\n';
+        report += 'Venue: ' + eventGR.venue.getDisplayValue() + '\n\n';
+        
+        var assignmentGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+        assignmentGR.addQuery('event', eventId);
+        assignmentGR.orderBy('shift_start');
+        assignmentGR.orderBy('role');
+        assignmentGR.query();
+        
+        var currentTime = '';
+        while (assignmentGR.next()) {
+            var shiftTime = assignmentGR.shift_start.getDisplayValue().substring(11, 16);
+            if (shiftTime !== currentTime) {
+                currentTime = shiftTime;
+                report += '\n' + shiftTime + ':\n';
+            }
+            
+            report += '  ' + assignmentGR.role.getDisplayValue() + ' - ';
+            report += assignmentGR.location + ' - ';
+            report += (assignmentGR.staff_member ? assignmentGR.staff_member.getDisplayValue() : 'UNASSIGNED') + '\n';
+        }
+        
+        return report;
+    },
+    
+    getStaffUtilization: function(startDate, endDate) {
+        var utilization = {};
+        
+        var assignmentGR = new GlideRecord('x_som_sports_ops_staff_assignment');
+        assignmentGR.addQuery('shift_start', '>=', startDate);
+        assignmentGR.addQuery('shift_end', '<=', endDate);
+        assignmentGR.addQuery('staff_member', '!=', '');
+        assignmentGR.query();
+        
+        while (assignmentGR.next()) {
+            var staffId = assignmentGR.staff_member.toString();
+            if (!utilization[staffId]) {
+                utilization[staffId] = {
+                    name: assignmentGR.staff_member.getDisplayValue(),
+                    hours: 0,
+                    assignments: 0
+                };
+            }
+            
+            var duration = this._calculateDuration(assignmentGR.shift_start, assignmentGR.shift_end);
+            utilization[staffId].hours += duration;
+            utilization[staffId].assignments++;
+        }
+        
+        return utilization;
+    },
+    
+    _calculateDuration: function(startTime, endTime) {
+        var start = new GlideDateTime(startTime);
+        var end = new GlideDateTime(endTime);
+        var duration = GlideDateTime.subtract(end, start);
+        return duration.getNumericValue() / (1000 * 60 * 60); // Convert to hours
+    },
+
+    type: 'StaffSchedulingUtil'
+};
+]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>ss001234567890123456789012345678901234ss</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>StaffSchedulingUtil</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_script_include_ss001234567890123456789012345678901234ss</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+    </sys_script_include>
+</record_update>

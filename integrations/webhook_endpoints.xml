@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_rest_resource">
+    <sys_rest_resource action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <description>REST endpoints for external systems to send data to Sports Operations Management</description>
+        <name>Sports Operations Webhooks</name>
+        <namespace>x_som_sports_ops</namespace>
+        <path>webhooks</path>
+        <produces>application/json</produces>
+        <relative_path>/webhooks</relative_path>
+        <script/>
+        <sys_class_name>sys_rest_resource</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2024-01-01 00:00:00</sys_created_on>
+        <sys_id>rr001234567890123456789012345678901234rr</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>Sports Operations Webhooks</sys_name>
+        <sys_package display_value="Sports Operations Management" source="x_som_sports_ops">a1b2c3d4e5f6789012345678901234567890abcd</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Sports Operations Management">a1b2c3d4e5f6789012345678901234567890abcd</sys_scope>
+        <sys_update_name>sys_rest_resource_rr001234567890123456789012345678901234rr</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
+    </sys_rest_resource>
+</record_update>
