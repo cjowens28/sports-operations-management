@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sports-ops-agent": {
+      "command": "node",
+      "args": ["./MCP-Agents/sports-ops-agent/index.js"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
